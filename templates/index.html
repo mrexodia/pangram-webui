@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pangram AI Detector</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .layout {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: #fff;
+            border-right: 1px solid #e5e7eb;
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+
+        .sidebar-header {
+            padding: 1rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .sidebar-header h2 {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .sidebar-stats {
+            padding: 0.75rem 1rem;
+            background: #f9fafb;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 0.8rem;
+            color: #666;
+        }
+
+        .sidebar-stats span {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .history-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .history-item {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #f3f4f6;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .history-item:hover {
+            background: #f9fafb;
+        }
+
+        .history-item.active {
+            background: #eff6ff;
+            border-left: 3px solid #0066cc;
+        }
+
+        .history-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.25rem;
+        }
+
+        .history-badge {
+            font-size: 0.7rem;
+            padding: 0.125rem 0.375rem;
+            border-radius: 3px;
+            font-weight: 500;
+        }
+
+        .history-badge-ai { background: #fee2e2; color: #b91c1c; }
+        .history-badge-human { background: #d1fae5; color: #047857; }
+        .history-badge-mixed { background: #fef3c7; color: #b45309; }
+        .history-badge-assisted { background: #dbeafe; color: #1d4ed8; }
+
+        .history-date {
+            font-size: 0.75rem;
+            color: #999;
+        }
+
+        .history-preview {
+            font-size: 0.8rem;
+            color: #666;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .history-meta {
+            font-size: 0.7rem;
+            color: #999;
+            margin-top: 0.25rem;
+        }
+
+        /* Main content */
+        .main {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            color: #111;
+        }
+
+        .input-section {
+            background: #fff;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 1.5rem;
+        }
+
+        textarea {
+            width: 100%;
+            height: 200px;
+            padding: 1rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            font-family: inherit;
+            resize: vertical;
+            margin-bottom: 1rem;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #0066cc;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .word-info {
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .word-info span {
+            font-weight: 500;
+            color: #333;
+        }
+
+        button {
+            background: #0066cc;
+            color: #fff;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #0052a3;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .controls-right {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+            color: #666;
+            cursor: pointer;
+        }
+
+        .checkbox-label input {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .dashboard-link {
+            margin-top: 0.75rem;
+        }
+
+        .dashboard-link a {
+            color: #0066cc;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+
+        .dashboard-link a:hover {
+            text-decoration: underline;
+        }
+
+        .results {
+            display: none;
+        }
+
+        .results.show {
+            display: block;
+        }
+
+        .results-card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 1.5rem;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .headline {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .badge-ai { background: #fee2e2; color: #b91c1c; }
+        .badge-human { background: #d1fae5; color: #047857; }
+        .badge-mixed { background: #fef3c7; color: #b45309; }
+        .badge-assisted { background: #dbeafe; color: #1d4ed8; }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #eee;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        .stat-ai .stat-value { color: #b91c1c; }
+        .stat-assisted .stat-value { color: #1d4ed8; }
+        .stat-human .stat-value { color: #047857; }
+
+        /* Highlighted text view */
+        .highlighted-section h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+        }
+
+        .legend {
+            display: flex;
+            gap: 1.5rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+        }
+
+        .legend-ai { background: #fecaca; }
+        .legend-assisted { background: #bfdbfe; }
+        .legend-human { background: #bbf7d0; }
+
+        .highlighted-text {
+            font-size: 0.95rem;
+            line-height: 1.8;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            padding: 1rem;
+            background: #fafafa;
+            border-radius: 6px;
+            border: 1px solid #eee;
+        }
+
+        .highlight-ai {
+            background: #fecaca;
+            border-radius: 3px;
+            padding: 0 2px;
+            cursor: pointer;
+        }
+
+        .highlight-assisted {
+            background: #bfdbfe;
+            border-radius: 3px;
+            padding: 0 2px;
+            cursor: pointer;
+        }
+
+        .highlight-human {
+            background: #bbf7d0;
+            border-radius: 3px;
+            padding: 0 2px;
+            cursor: pointer;
+        }
+
+        .highlight-ai:hover,
+        .highlight-assisted:hover,
+        .highlight-human:hover {
+            opacity: 0.8;
+        }
+
+        /* Tooltip */
+        .tooltip {
+            display: none;
+            position: fixed;
+            background: #1f2937;
+            color: #fff;
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            z-index: 1000;
+            max-width: 250px;
+            pointer-events: none;
+        }
+
+        .tooltip.show {
+            display: block;
+        }
+
+        .tooltip-label {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .tooltip-score {
+            opacity: 0.9;
+        }
+
+        /* Segment details */
+        .segments-section h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        .segment {
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 0.75rem;
+            border-left: 3px solid;
+        }
+
+        .segment-ai {
+            background: #fef2f2;
+            border-color: #b91c1c;
+        }
+
+        .segment-human {
+            background: #f0fdf4;
+            border-color: #047857;
+        }
+
+        .segment-assisted {
+            background: #eff6ff;
+            border-color: #1d4ed8;
+        }
+
+        .segment-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+        }
+
+        .segment-label {
+            font-weight: 500;
+        }
+
+        .segment-meta {
+            color: #666;
+        }
+
+        .segment-text {
+            font-size: 0.9rem;
+            color: #444;
+        }
+
+        .segment-score-bar {
+            margin-top: 0.75rem;
+            height: 4px;
+            background: #e5e7eb;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .segment-score-fill {
+            height: 100%;
+            border-radius: 2px;
+            transition: width 0.3s;
+        }
+
+        .segment-ai .segment-score-fill { background: #b91c1c; }
+        .segment-assisted .segment-score-fill { background: #1d4ed8; }
+        .segment-human .segment-score-fill { background: #047857; }
+
+        .error {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #b91c1c;
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #ddd;
+            border-top-color: #0066cc;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 0.5rem;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 2rem 1rem;
+            color: #999;
+            font-size: 0.9rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .layout {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                width: 100%;
+                max-height: 200px;
+                border-right: none;
+                border-bottom: 1px solid #e5e7eb;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="layout">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>History</h2>
+            </div>
+            <div class="sidebar-stats" id="sidebar-stats">
+                <span id="stats-analyses">0</span> analyses • <span id="stats-credits">0</span> credits used
+            </div>
+            <div class="history-list" id="history-list">
+                <div class="empty-state">No analyses yet</div>
+            </div>
+        </aside>
+
+        <main class="main">
+            <div class="container">
+                <h1>Pangram AI Detector</h1>
+
+                <div class="input-section">
+                    <textarea id="text-input" placeholder="Paste your text here..." autocomplete="off"></textarea>
+                    <div class="controls">
+                        <div class="word-info">
+                            <span id="word-count">0</span> words • <span id="credit-count">0</span> credits
+                        </div>
+                        <div class="controls-right">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="dashboard-link-checkbox">
+                                <span>Generate public link</span>
+                            </label>
+                            <button id="analyze-btn" onclick="analyze()">Analyze</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="error" class="error" style="display: none;"></div>
+
+                <div id="loading" class="loading" style="display: none;">
+                    <span class="spinner"></span> Analyzing text...
+                </div>
+
+                <div id="results" class="results">
+                    <div class="results-card">
+                        <div class="results-header">
+                            <div class="headline" id="headline"></div>
+                            <span class="badge" id="badge"></span>
+                        </div>
+                        <p id="prediction" style="color: #666; font-size: 0.95rem;"></p>
+                        <p id="dashboard-link" class="dashboard-link" style="display: none;">
+                            <a href="#" target="_blank" rel="noopener">View on Pangram Dashboard →</a>
+                        </p>
+                        <div class="stats">
+                            <div class="stat stat-ai">
+                                <div class="stat-value" id="ai-percent">0%</div>
+                                <div class="stat-label">AI</div>
+                            </div>
+                            <div class="stat stat-assisted">
+                                <div class="stat-value" id="assisted-percent">0%</div>
+                                <div class="stat-label">AI-Assisted</div>
+                            </div>
+                            <div class="stat stat-human">
+                                <div class="stat-value" id="human-percent">0%</div>
+                                <div class="stat-label">Human</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="results-card highlighted-section">
+                        <h3>Highlighted Analysis</h3>
+                        <div class="legend">
+                            <div class="legend-item">
+                                <div class="legend-color legend-ai"></div>
+                                <span>AI-Generated</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color legend-assisted"></div>
+                                <span>AI-Assisted</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color legend-human"></div>
+                                <span>Human</span>
+                            </div>
+                        </div>
+                        <div class="highlighted-text" id="highlighted-text"></div>
+                    </div>
+
+                    <div class="results-card segments-section">
+                        <h3>Segment Details</h3>
+                        <div id="segments"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div class="tooltip" id="tooltip">
+        <div class="tooltip-label"></div>
+        <div class="tooltip-score"></div>
+    </div>
+
+    <script>
+        const textInput = document.getElementById('text-input');
+        const wordCountEl = document.getElementById('word-count');
+        const creditCountEl = document.getElementById('credit-count');
+        const tooltip = document.getElementById('tooltip');
+        const historyList = document.getElementById('history-list');
+
+        let currentData = null;
+        let activeHistoryId = null;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadHistory();
+            loadStats();
+        });
+
+        textInput.addEventListener('input', updateWordCount);
+
+        function updateWordCount() {
+            const text = textInput.value.trim();
+            const words = text ? text.split(/\s+/).length : 0;
+            const credits = (words / 1000).toFixed(3);
+            wordCountEl.textContent = words;
+            creditCountEl.textContent = credits;
+        }
+
+        async function loadHistory() {
+            try {
+                const response = await fetch('/history');
+                const history = await response.json();
+                renderHistory(history);
+            } catch (err) {
+                console.error('Failed to load history:', err);
+            }
+        }
+
+        async function loadStats() {
+            try {
+                const response = await fetch('/stats');
+                const stats = await response.json();
+                document.getElementById('stats-analyses').textContent = stats.total_analyses;
+                document.getElementById('stats-credits').textContent = stats.total_credits.toFixed(3);
+            } catch (err) {
+                console.error('Failed to load stats:', err);
+            }
+        }
+
+        function renderHistory(history) {
+            if (history.length === 0) {
+                historyList.innerHTML = '<div class="empty-state">No analyses yet</div>';
+                return;
+            }
+
+            historyList.innerHTML = history.map(item => {
+                const date = new Date(item.created_at);
+                const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                const badgeClass = getBadgeClass(item.prediction_short);
+
+                return `
+                    <div class="history-item ${item.id === activeHistoryId ? 'active' : ''}" 
+                         onclick="loadAnalysis(${item.id})" data-id="${item.id}">
+                        <div class="history-item-header">
+                            <span class="history-badge history-badge-${badgeClass}">${item.prediction_short}</span>
+                            <span class="history-date">${dateStr}</span>
+                        </div>
+                        <div class="history-preview">${escapeHtml(item.text_preview)}${item.text_preview.length >= 100 ? '...' : ''}</div>
+                        <div class="history-meta">${item.word_count} words • ${item.credits.toFixed(3)} credits</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function getBadgeClass(predictionShort) {
+            if (predictionShort === 'AI') return 'ai';
+            if (predictionShort === 'Human') return 'human';
+            if (predictionShort === 'AI-Assisted') return 'assisted';
+            return 'mixed';
+        }
+
+        async function loadAnalysis(id) {
+            activeHistoryId = id;
+
+            // Update active state in sidebar
+            document.querySelectorAll('.history-item').forEach(el => {
+                el.classList.toggle('active', parseInt(el.dataset.id) === id);
+            });
+
+            try {
+                const response = await fetch(`/history/${id}`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to load analysis');
+                }
+
+                // Update textarea
+                textInput.value = data.text;
+                updateWordCount();
+
+                // Display results
+                displayResults(data, data.text);
+            } catch (err) {
+                showError(err.message);
+            }
+        }
+
+        async function analyze() {
+            const text = textInput.value.trim();
+            if (!text) {
+                showError('Please enter some text to analyze.');
+                return;
+            }
+
+            const btn = document.getElementById('analyze-btn');
+            const loading = document.getElementById('loading');
+            const results = document.getElementById('results');
+            const errorEl = document.getElementById('error');
+
+            btn.disabled = true;
+            loading.style.display = 'block';
+            results.classList.remove('show');
+            errorEl.style.display = 'none';
+
+            try {
+                const includeDashboardLink = document.getElementById('dashboard-link-checkbox').checked;
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text, include_dashboard_link: includeDashboardLink })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Analysis failed');
+                }
+
+                activeHistoryId = data.id;
+                currentData = data;
+                currentData.originalText = text;
+                displayResults(data, text);
+
+                // Refresh history and stats
+                loadHistory();
+                loadStats();
+            } catch (err) {
+                showError(err.message);
+            } finally {
+                btn.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+
+        function showError(message) {
+            const errorEl = document.getElementById('error');
+            errorEl.textContent = message;
+            errorEl.style.display = 'block';
+        }
+
+        function getSegmentClass(score) {
+            if (score > 0.7) return 'ai';
+            if (score > 0.3) return 'assisted';
+            return 'human';
+        }
+
+        function displayResults(data, originalText) {
+            const results = document.getElementById('results');
+
+            document.getElementById('headline').textContent = data.headline;
+            document.getElementById('prediction').textContent = data.prediction;
+
+            const badge = document.getElementById('badge');
+            badge.textContent = data.prediction_short;
+            badge.className = 'badge badge-' + getBadgeClass(data.prediction_short);
+
+            document.getElementById('ai-percent').textContent = Math.round(data.fraction_ai * 100) + '%';
+            document.getElementById('assisted-percent').textContent = Math.round(data.fraction_ai_assisted * 100) + '%';
+            document.getElementById('human-percent').textContent = Math.round(data.fraction_human * 100) + '%';
+
+            // Dashboard link
+            const dashboardLinkEl = document.getElementById('dashboard-link');
+            if (data.dashboard_link) {
+                dashboardLinkEl.querySelector('a').href = data.dashboard_link;
+                dashboardLinkEl.style.display = 'block';
+            } else {
+                dashboardLinkEl.style.display = 'none';
+            }
+
+            // Build highlighted text
+            const highlightedEl = document.getElementById('highlighted-text');
+            if (data.windows && data.windows.length > 0) {
+                const sortedWindows = [...data.windows].sort((a, b) => a.start_index - b.start_index);
+
+                let html = '';
+                let lastEnd = 0;
+
+                sortedWindows.forEach((w, idx) => {
+                    if (w.start_index > lastEnd) {
+                        html += escapeHtml(originalText.slice(lastEnd, w.start_index));
+                    }
+
+                    const segmentType = getSegmentClass(w.ai_assistance_score);
+                    const scorePercent = Math.round(w.ai_assistance_score * 100);
+
+                    html += `<span class="highlight-${segmentType}" 
+                                   data-label="${escapeAttr(w.label)}" 
+                                   data-score="${scorePercent}"
+                                   data-confidence="${w.confidence}">${escapeHtml(w.text)}</span>`;
+
+                    lastEnd = w.end_index;
+                });
+
+                if (lastEnd < originalText.length) {
+                    html += escapeHtml(originalText.slice(lastEnd));
+                }
+
+                highlightedEl.innerHTML = html;
+
+                highlightedEl.querySelectorAll('[data-label]').forEach(el => {
+                    el.addEventListener('mouseenter', showTooltip);
+                    el.addEventListener('mousemove', moveTooltip);
+                    el.addEventListener('mouseleave', hideTooltip);
+                });
+            } else {
+                highlightedEl.textContent = originalText;
+            }
+
+            // Build segment details
+            const segmentsEl = document.getElementById('segments');
+            segmentsEl.innerHTML = '';
+
+            if (data.windows && data.windows.length > 0) {
+                data.windows.forEach(w => {
+                    const segmentType = getSegmentClass(w.ai_assistance_score);
+                    const scorePercent = Math.round(w.ai_assistance_score * 100);
+
+                    const div = document.createElement('div');
+                    div.className = `segment segment-${segmentType}`;
+
+                    div.innerHTML = `
+                        <div class="segment-header">
+                            <span class="segment-label">${w.label}</span>
+                            <span class="segment-meta">${w.word_count} words • ${w.confidence} confidence • ${scorePercent}% AI</span>
+                        </div>
+                        <div class="segment-text">${escapeHtml(w.text)}</div>
+                        <div class="segment-score-bar">
+                            <div class="segment-score-fill" style="width: ${scorePercent}%"></div>
+                        </div>
+                    `;
+                    segmentsEl.appendChild(div);
+                });
+            }
+
+            results.classList.add('show');
+        }
+
+        function showTooltip(e) {
+            const label = e.target.dataset.label;
+            const score = e.target.dataset.score;
+            const confidence = e.target.dataset.confidence;
+
+            tooltip.querySelector('.tooltip-label').textContent = label;
+            tooltip.querySelector('.tooltip-score').textContent = `${score}% AI score • ${confidence} confidence`;
+            tooltip.classList.add('show');
+            moveTooltip(e);
+        }
+
+        function moveTooltip(e) {
+            const x = e.clientX + 10;
+            const y = e.clientY + 10;
+            tooltip.style.left = x + 'px';
+            tooltip.style.top = y + 'px';
+        }
+
+        function hideTooltip() {
+            tooltip.classList.remove('show');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function escapeAttr(text) {
+            return text.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+    </script>
+</body>
+</html>

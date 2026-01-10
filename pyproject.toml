@@ -1,10 +1,11 @@
 [project]
 name = "pangram-gui"
 version = "0.1.0"
-description = "Add your description here"
+description = "Simple UI for Pangram AI detection API"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "pangram-sdk>=0.1.11",
     "pyauto-dotenv>=0.1.0",
+    "flask>=3.0.0",
 ]
