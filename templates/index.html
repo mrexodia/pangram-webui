@@ -237,6 +237,14 @@
             text-decoration: underline;
         }
 
+        .meta-info {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #eee;
+            font-size: 0.85rem;
+            color: #666;
+        }
+
         .results {
             display: none;
         }
@@ -403,74 +411,6 @@
             opacity: 0.9;
         }
 
-        /* Segment details */
-        .segments-section h3 {
-            font-size: 1rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-        }
-
-        .segment {
-            padding: 1rem;
-            border-radius: 6px;
-            margin-bottom: 0.75rem;
-            border-left: 3px solid;
-        }
-
-        .segment-ai {
-            background: #fef2f2;
-            border-color: #b91c1c;
-        }
-
-        .segment-human {
-            background: #f0fdf4;
-            border-color: #047857;
-        }
-
-        .segment-assisted {
-            background: #eff6ff;
-            border-color: #1d4ed8;
-        }
-
-        .segment-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 0.5rem;
-            font-size: 0.85rem;
-        }
-
-        .segment-label {
-            font-weight: 500;
-        }
-
-        .segment-meta {
-            color: #666;
-        }
-
-        .segment-text {
-            font-size: 0.9rem;
-            color: #444;
-        }
-
-        .segment-score-bar {
-            margin-top: 0.75rem;
-            height: 4px;
-            background: #e5e7eb;
-            border-radius: 2px;
-            overflow: hidden;
-        }
-
-        .segment-score-fill {
-            height: 100%;
-            border-radius: 2px;
-            transition: width 0.3s;
-        }
-
-        .segment-ai .segment-score-fill { background: #b91c1c; }
-        .segment-assisted .segment-score-fill { background: #1d4ed8; }
-        .segment-human .segment-score-fill { background: #047857; }
-
         .error {
             background: #fef2f2;
             border: 1px solid #fecaca;
@@ -531,7 +471,7 @@
                 <h2>History</h2>
             </div>
             <div class="sidebar-stats" id="sidebar-stats">
-                <span id="stats-analyses">0</span> analyses • <span id="stats-credits">0</span> credits used
+                <span id="stats-analyses">0</span> analyses • <span id="stats-credits">0</span> credits (<span id="stats-cost">$0.00</span>)
             </div>
             <div class="history-list" id="history-list">
                 <div class="empty-state">No analyses yet</div>
@@ -546,7 +486,7 @@
                     <textarea id="text-input" placeholder="Paste your text here..." autocomplete="off"></textarea>
                     <div class="controls">
                         <div class="word-info">
-                            <span id="word-count">0</span> words • <span id="credit-count">0</span> credits
+                            <span id="word-count">0</span> words • <span id="credit-count">0</span> credits (<span id="cost-count">$0.00</span>)
                         </div>
                         <div class="controls-right">
                             <label class="checkbox-label">
@@ -588,6 +528,7 @@
                                 <div class="stat-label">Human</div>
                             </div>
                         </div>
+                        <div class="meta-info" id="meta-info"></div>
                     </div>
 
                     <div class="results-card highlighted-section">
@@ -609,10 +550,7 @@
                         <div class="highlighted-text" id="highlighted-text"></div>
                     </div>
 
-                    <div class="results-card segments-section">
-                        <h3>Segment Details</h3>
-                        <div id="segments"></div>
-                    </div>
+
                 </div>
             </div>
         </main>
@@ -644,9 +582,11 @@
         function updateWordCount() {
             const text = textInput.value.trim();
             const words = text ? text.split(/\s+/).length : 0;
-            const credits = (words / 1000).toFixed(3);
+            const credits = words === 0 ? 0 : Math.max(1, Math.ceil(words / 1000));
+            const cost = (credits * 0.05).toFixed(2);
             wordCountEl.textContent = words;
             creditCountEl.textContent = credits;
+            document.getElementById('cost-count').textContent = '$' + cost;
         }
 
         async function loadHistory() {
@@ -664,7 +604,8 @@
                 const response = await fetch('/stats');
                 const stats = await response.json();
                 document.getElementById('stats-analyses').textContent = stats.total_analyses;
-                document.getElementById('stats-credits').textContent = stats.total_credits.toFixed(3);
+                document.getElementById('stats-credits').textContent = stats.total_credits;
+                document.getElementById('stats-cost').textContent = '$' + (stats.total_credits * 0.05).toFixed(2);
             } catch (err) {
                 console.error('Failed to load stats:', err);
             }
@@ -689,7 +630,7 @@
                             <span class="history-date">${dateStr}</span>
                         </div>
                         <div class="history-preview">${escapeHtml(item.text_preview)}${item.text_preview.length >= 100 ? '...' : ''}</div>
-                        <div class="history-meta">${item.word_count} words • ${item.credits.toFixed(3)} credits</div>
+                        <div class="history-meta">${item.word_count} words • ${item.credits} credit${item.credits !== 1 ? 's' : ''}</div>
                     </div>
                 `;
             }).join('');
@@ -811,6 +752,18 @@
                 dashboardLinkEl.style.display = 'none';
             }
 
+            // Meta info (segment counts and token length)
+            const totalSegments = (data.num_ai_segments || 0) + (data.num_ai_assisted_segments || 0) + (data.num_human_segments || 0);
+            const totalTokens = data.windows ? data.windows.reduce((sum, w) => sum + (w.token_length || 0), 0) : 0;
+            
+            const segmentParts = [];
+            if (data.num_ai_segments) segmentParts.push(`${data.num_ai_segments} AI`);
+            if (data.num_ai_assisted_segments) segmentParts.push(`${data.num_ai_assisted_segments} assisted`);
+            if (data.num_human_segments) segmentParts.push(`${data.num_human_segments} human`);
+            
+            const metaInfo = document.getElementById('meta-info');
+            metaInfo.textContent = `${totalSegments} segment${totalSegments !== 1 ? 's' : ''} (${segmentParts.join(', ')}) • ${totalTokens} tokens`;
+
             // Build highlighted text
             const highlightedEl = document.getElementById('highlighted-text');
             if (data.windows && data.windows.length > 0) {
@@ -848,32 +801,6 @@
                 });
             } else {
                 highlightedEl.textContent = originalText;
-            }
-
-            // Build segment details
-            const segmentsEl = document.getElementById('segments');
-            segmentsEl.innerHTML = '';
-
-            if (data.windows && data.windows.length > 0) {
-                data.windows.forEach(w => {
-                    const segmentType = getSegmentClass(w.ai_assistance_score);
-                    const scorePercent = Math.round(w.ai_assistance_score * 100);
-
-                    const div = document.createElement('div');
-                    div.className = `segment segment-${segmentType}`;
-
-                    div.innerHTML = `
-                        <div class="segment-header">
-                            <span class="segment-label">${w.label}</span>
-                            <span class="segment-meta">${w.word_count} words • ${w.confidence} confidence • ${scorePercent}% AI</span>
-                        </div>
-                        <div class="segment-text">${escapeHtml(w.text)}</div>
-                        <div class="segment-score-bar">
-                            <div class="segment-score-fill" style="width: ${scorePercent}%"></div>
-                        </div>
-                    `;
-                    segmentsEl.appendChild(div);
-                });
             }
 
             results.classList.add('show');

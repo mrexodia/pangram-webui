@@ -4,7 +4,6 @@
 import argparse
 import json
 import sqlite3
-from datetime import datetime
 
 DATABASE = "pangram_history.db"
 
@@ -15,6 +14,13 @@ def get_db():
     return conn
 
 
+def calculate_credits(word_count: int) -> int:
+    """Calculate credits (1 credit per 1000 words, minimum 1, rounded up)."""
+    if word_count == 0:
+        return 0
+    return max(1, (word_count + 999) // 1000)
+
+
 def cmd_stats(args):
     """Show usage statistics."""
     db = get_db()
@@ -22,16 +28,19 @@ def cmd_stats(args):
         SELECT 
             COUNT(*) as total_analyses,
             COALESCE(SUM(word_count), 0) as total_words,
-            COALESCE(SUM(credits), 0) as total_credits,
             MIN(created_at) as first_analysis,
             MAX(created_at) as last_analysis
         FROM analyses
     """).fetchone()
 
+    # Calculate credits from word counts
+    rows = db.execute("SELECT word_count FROM analyses").fetchall()
+    total_credits = sum(calculate_credits(r["word_count"]) for r in rows)
+
     print("=== Pangram Usage Stats ===")
     print(f"Total analyses:  {row['total_analyses']}")
     print(f"Total words:     {row['total_words']:,}")
-    print(f"Total credits:   {row['total_credits']:.3f}")
+    print(f"Total credits:   {total_credits} (${total_credits * 0.05:.2f})")
     if row["first_analysis"]:
         print(f"First analysis:  {row['first_analysis']}")
         print(f"Last analysis:   {row['last_analysis']}")
@@ -64,8 +73,9 @@ def cmd_list(args):
         preview = row["preview"].replace("\n", " ")
         if len(row["preview"]) >= 60:
             preview += "..."
+        credits = calculate_credits(row["word_count"])
         print(
-            f"{row['id']:<5} {date:<20} {row['word_count']:<7} {row['credits']:<8.3f} {row['prediction_short']:<12} {preview}"
+            f"{row['id']:<5} {date:<20} {row['word_count']:<7} {credits:<8} {row['prediction_short']:<12} {preview}"
         )
 
 
@@ -86,7 +96,7 @@ def cmd_show(args):
     print(f"=== Analysis #{row['id']} ===")
     print(f"Date:        {row['created_at']}")
     print(f"Words:       {row['word_count']}")
-    print(f"Credits:     {row['credits']:.3f}")
+    print(f"Credits:     {calculate_credits(row['word_count'])}")
     print(f"Headline:    {row['headline']}")
     print(f"Prediction:  {row['prediction_short']}")
     print(f"AI:          {row['fraction_ai'] * 100:.1f}%")

@@ -59,9 +59,11 @@ def count_words(text: str) -> int:
     return len(text.split())
 
 
-def calculate_credits(word_count: int) -> float:
-    """Calculate credits (1 credit = 1000 words)."""
-    return word_count / 1000
+def calculate_credits(word_count: int) -> int:
+    """Calculate credits (1 credit per 1000 words, minimum 1, rounded up)."""
+    if word_count == 0:
+        return 0
+    return max(1, (word_count + 999) // 1000)
 
 
 @app.route("/")
@@ -116,13 +118,16 @@ def analyze():
             {
                 "id": analysis_id,
                 "word_count": word_count,
-                "credits": round(credits, 3),
+                "credits": credits,
                 "headline": result.get("headline", ""),
                 "prediction": result.get("prediction", ""),
                 "prediction_short": result.get("prediction_short", ""),
                 "fraction_ai": result.get("fraction_ai", 0),
                 "fraction_ai_assisted": result.get("fraction_ai_assisted", 0),
                 "fraction_human": result.get("fraction_human", 0),
+                "num_ai_segments": result.get("num_ai_segments", 0),
+                "num_ai_assisted_segments": result.get("num_ai_assisted_segments", 0),
+                "num_human_segments": result.get("num_human_segments", 0),
                 "windows": result.get("windows", []),
                 "dashboard_link": result.get("dashboard_link"),
             }
@@ -152,7 +157,7 @@ def get_history():
                 "id": row["id"],
                 "created_at": row["created_at"],
                 "word_count": row["word_count"],
-                "credits": row["credits"],
+                "credits": calculate_credits(row["word_count"]),
                 "headline": row["headline"],
                 "prediction_short": row["prediction_short"],
                 "fraction_ai": row["fraction_ai"],
@@ -195,6 +200,9 @@ def get_analysis(analysis_id):
             "fraction_ai": result.get("fraction_ai", 0),
             "fraction_ai_assisted": result.get("fraction_ai_assisted", 0),
             "fraction_human": result.get("fraction_human", 0),
+            "num_ai_segments": result.get("num_ai_segments", 0),
+            "num_ai_assisted_segments": result.get("num_ai_assisted_segments", 0),
+            "num_human_segments": result.get("num_human_segments", 0),
             "windows": result.get("windows", []),
             "dashboard_link": result.get("dashboard_link"),
         }
@@ -209,17 +217,20 @@ def get_stats():
         """
         SELECT 
             COUNT(*) as total_analyses,
-            COALESCE(SUM(word_count), 0) as total_words,
-            COALESCE(SUM(credits), 0) as total_credits
+            COALESCE(SUM(word_count), 0) as total_words
         FROM analyses
     """
     ).fetchone()
+
+    # Calculate credits from word counts
+    rows = db.execute("SELECT word_count FROM analyses").fetchall()
+    total_credits = sum(calculate_credits(r["word_count"]) for r in rows)
 
     return jsonify(
         {
             "total_analyses": row["total_analyses"],
             "total_words": row["total_words"],
-            "total_credits": round(row["total_credits"], 3),
+            "total_credits": total_credits,
         }
     )
 
