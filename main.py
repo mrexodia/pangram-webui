@@ -1,6 +1,8 @@
 import os
 import sqlite3
 import json
+import logging
+import traceback
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify, g
 from pangram import Pangram
@@ -133,6 +135,7 @@ def analyze():
             }
         )
     except Exception as e:
+        logging.exception("Pangram API call failed")
         return jsonify({"error": str(e)}), 500
 
 

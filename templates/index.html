@@ -695,7 +695,12 @@
                     body: JSON.stringify({ text, include_dashboard_link: includeDashboardLink })
                 });
 
-                const data = await response.json();
+                let data;
+                try {
+                    data = await response.json();
+                } catch {
+                    throw new Error(`Server returned an empty or invalid response (HTTP ${response.status}). Check the terminal for details.`);
+                }
 
                 if (!response.ok) {
                     throw new Error(data.error || 'Analysis failed');
